@@ -19,9 +19,9 @@
 #define PIN_POT_L 5
 #define PIN_POT_R 6
 
-#define NO_FROST_ON_TIMER ((uint64_t)1000 * 60 * 60 * 24 * 7 * 2) // 604 800 000 неделя
-#define NO_FROST_OFF_TIMER ((uint64_t)1000 * 60 * 60 * 2)         // 2 часа
-#define NO_FROST_EEPROM_TIMER ((uint64_t)1000 * 60 * 60 * 24)     // как часто писать в EEPROM время работы без NO_FROST
+#define NO_FROST_ON_TIME ((uint64_t)1000 * 60 * 60 * 24 * 7 * 2) // 604 800 000 неделя
+#define NO_FROST_OFF_TIME ((uint64_t)1000 * 60 * 60 * 2)         // 2 часа
+#define NO_FROST_EEPROM_TIME ((uint64_t)1000 * 60 * 60 * 24)     // как часто писать в EEPROM время работы без NO_FROST
 #define NO_FROST_MAX_FRIDGE_TEMPERATURE 10
 #define NO_FROST_MAX_FREEZER_TEMPERATURE -10
 
@@ -44,7 +44,7 @@
 #define TEMP_FRIDGE_MIN_RANGE 1
 
 GyverDS18Single sensorFridge(PIN_SENS_FRIDGE, 0);
-GyverDS18Single sensorFrizer(PIN_SENS_FREEZER, 0);
+GyverDS18Single sensorFreezer(PIN_SENS_FREEZER, 0);
 
 Relay compressor(PIN_RELAY, 1, RELAY_CHANGE_TIMER);
 
@@ -56,6 +56,14 @@ bool noFrostState = 0;
 
 EEManager EE_FrostWorkTime(FrostWorkTime);
 EEManager EE_noFrostState(noFrostState);
+
+Potentiometr PotFreezerL(PIN_POT_L, true, 20, TEMP_FREEZER_MIN, TEMP_FREEZER_MAX, 5, 200);
+Potentiometr PotFridgeR(PIN_POT_R, true, 20, TEMP_FRIDGE_MIN, TEMP_FRIDGE_MAX, 5, 200);
+
+int16_t tempFreezer = -99, tempFridge = -99, tempFreezerReq, tempFridgeReq, tempFridgeRange = TEMP_FRIDGE_DEFAULT_RANGE, tempFreezerRange = TEMP_FREEZER_DEFAULT_RANGE;
+EEManager EE_tempFreezerRange(tempFreezerRange);
+EEManager EE_tempFridgeRange(tempFridgeRange);
+
 void setup()
 {
 #ifdef MY_DEBUG
@@ -63,22 +71,87 @@ void setup()
 #endif
     EE_FrostWorkTime.begin(0, 'b');
     EE_noFrostState.begin(EE_FrostWorkTime.nextAddr(), 'b');
+    EE_tempFreezerRange.begin(EE_noFrostState.nextAddr(), 'b');
+    EE_tempFridgeRange.begin(EE_tempFreezerRange.nextAddr(), 'b');
+
+    sensorFridge.requestTemp();
+    sensorFreezer.requestTemp();
+
+    PotFreezerL.tick();
+    PotFridgeR.tick();
+
+    tempFreezerReq = PotFreezerL.getValue();
+    tempFridgeReq = PotFridgeR.getValue();
 }
 
 uint8_t mode = 0;
-#define MODE_NORMAL 0
+// #define MODE_NORMAL 0
 #define MODE_NO_FROST 1
-#define MODE_SETUP 2
-#define MODE_EXTRA 3
+#define MODE_SETUP_FREEZER 2
+#define MODE_SETUP_FRIDGE 3
+
+#define MODE_EXTRA 4
 
 void loop()
 {
     EE_FrostWorkTime.tick();
     EE_noFrostState.tick();
 
-    TMR64(NO_FROST_EEPROM_TIMER,
+    TMR64(NO_FROST_EEPROM_TIME,
           {
               FrostWorkTime += millis();
               EE_FrostWorkTime.update();
           });
+    static uint64_t timer_NO_FROST_ON = 0;
+    if ((millis() - timer_NO_FROST_ON) >= NO_FROST_ON_TIME)
+    {
+        timer_NO_FROST_ON = millis();
+    }
+    if (sensorFridge.ready())
+    { // измерения готовы по таймеру
+        if (sensorFridge.readTemp())
+        { // если чтение успешно
+            tempFridge = sensorFridge.getTempInt();
+        }
+        else
+        {
+            DD("Error sensorFridge.readTemp()  Loop");
+        }
+        sensorFridge.requestTemp(); // запрос следующего измерения
+    }
+    if (sensorFreezer.ready())
+    { // измерения готовы по таймеру
+        if (sensorFreezer.readTemp())
+        { // если чтение успешно
+            tempFreezer = sensorFreezer.getTempInt();
+        }
+        else
+        {
+            DD("Error sensorFreezer.readTemp()  Loop");
+        }
+        sensorFreezer.requestTemp(); // запрос следующего измерения
+    }
+
+    if (PotFreezerL.tick())
+        mode = MODE_SETUP_FREEZER;
+    if (PotFridgeR.tick())
+        mode = MODE_SETUP_FRIDGE;
+    switch (mode)
+    {
+    case MODE_NO_FROST:
+        /* code */
+        break;
+    case MODE_SETUP_FREEZER:
+        break;
+    case MODE_SETUP_FRIDGE:
+        break;
+    default:
+    {
+        if (tempFreezer - tempFreezerReq > TEMP_FREEZER_MAX_RANGE)
+        {
+            
+        }
+    }
+    break;
+    }
 }
