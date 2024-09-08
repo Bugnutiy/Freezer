@@ -18,7 +18,7 @@ public:
         _state = !_state;
         digitalWrite(_pin, _state);
     }
-    void setState(bool state)
+    void set(bool state)
     {
         _state = state;
         digitalWrite(_pin, _state);

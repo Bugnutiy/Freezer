@@ -21,6 +21,8 @@ public:
 
     bool ready();
     void tick();
+    bool on();
+    bool off();
 };
 
 /// @brief Конструктор класса реле
@@ -123,6 +125,16 @@ void Relay::tick()
             digitalWrite(_pin, _state);
         }
     }
+}
+
+bool Relay::on()
+{
+    return set(1);
+}
+
+bool Relay::off()
+{
+    return set(0);
 }
 
 void Relay::_setState(bool state, bool now)
