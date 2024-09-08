@@ -54,10 +54,10 @@ Relay compressor(PIN_RELAY, 1, RELAY_CHANGE_TIMER);
 uint64_t compressorTimerWork = 0, compressorTimerChill = 0, compressorTimerAutoChill = 0;
 bool chilling = 0;
 
-SimpleLed ledFridge(PIN_LED_FRIDGE);
-SimpleLed ledFreezer(PIN_LED_FREEZER);
+SimpleLed ledFridgeR(PIN_LED_FRIDGE);
+SimpleLed ledFreezerL(PIN_LED_FREEZER);
 
-uint64_t FrostWorkTime = 0, FrostWorkTimer = 0, NoFrostTimer = 0; ///
+uint64_t FrostWorkTime = 0, FrostWorkTimer = 0, NoFrostTimer = 0, SetupTimer = 0; ///
 bool noFrostState = 0;
 
 EEManager EE_FrostWorkTime(FrostWorkTime, 60000);
@@ -151,6 +151,7 @@ void potAndModUpdate()
     if (PotFreezerL.tick())
     {
         mode = MODE_SETUP_FREEZER;
+        SetupTimer = millis();
         DD("MODE_SETUP_FREEZER");
         DDD("POT_L: ");
         DDD(PotFreezerL.getRawValue());
@@ -160,6 +161,7 @@ void potAndModUpdate()
     }
     if (PotFridgeR.tick())
     {
+        SetupTimer = millis();
         mode = MODE_SETUP_FRIDGE;
         DD("MODE_SETUP_FRIDGE");
         DDD("POT_R: ");
@@ -203,14 +205,15 @@ void loop()
     switch (mode)
     {
     case MODE_NO_FROST:
+    {
         while (noFrostState)
         {
             compressor.tick();
             compressor.off();
-            ledFridge.blink(500);
-            ledFreezer.blink(2000);
+            ledFridgeR.blink(500);
+            ledFreezerL.blink(2000);
             tempUpdate();
-            if ((tempFreezer > NO_FROST_MAX_FREEZER_TEMPERATURE) || (tempFridge > NO_FROST_MAX_FRIDGE_TEMPERATURE))
+            if ((tempFreezer >= NO_FROST_MAX_FREEZER_TEMPERATURE) || (tempFridge >= NO_FROST_MAX_FRIDGE_TEMPERATURE))
             {
                 noFrostState = 0;
             }
@@ -220,12 +223,161 @@ void loop()
             }
         }
         mode = MODE_NORMAL;
-        DDD("MODE_NORMAL");
-        break;
+        DD("MODE_NORMAL");
+        EE_noFrostState.update();
+        NoFrostTimer = millis();
+        FrostWorkTimer = millis();
+        FrostWorkTime = millis();
+        EE_FrostWorkTime.update();
+        EE_FrostWorkTimer.update();
+    }
+    break;
     case MODE_SETUP_FREEZER:
-        break;
+    {
+        int16_t temp = 0, range = 0;
+        bool rangeChanged = false;
+        while ((uint64_t)millis() - SetupTimer <= 5000)
+        {
+            ledFreezerL.blink(1000);
+            bool Pot1 = PotFreezerL.tick();
+            bool Pot2 = PotFridgeR.tick();
+            if (Pot1 || Pot2)
+            {
+                SetupTimer = millis();
+            }
+            temp = PotFreezerL.getValue();
+            if (Pot2)
+            {
+                ledFridgeR.blink(200);
+                range = map(PotFridgeR.getRawValue(), 0, 1023, TEMP_FREEZER_MIN_RANGE, TEMP_FREEZER_MAX_RANGE);
+                rangeChanged = 1;
+            }
+            if (!rangeChanged)
+            {
+                if (temp < tempFreezer)
+                {
+                    compressor.setNow(1);
+                }
+                else
+                {
+                    compressor.setNow(0);
+                }
+            }
+        }
+        if (rangeChanged)
+        {
+            tempFreezerRange = range;
+            EE_tempFreezerRange.update();
+
+            uint16_t speed = 200;
+            if (range < 0)
+            {
+                speed = 500;
+                range = -range;
+            }
+            uint8_t KL = (range / 10) % 10, KR = range % 10;
+            while (ledFreezerL.blink(speed, KL))
+            {
+            }
+            while (ledFridgeR.blink(speed, KR))
+            {
+            }
+        }
+        else
+        {
+            tempFreezerReq = temp;
+            EE_tempFreezerReq.update();
+
+            uint16_t speed = 200;
+            if (temp < 0)
+            {
+                speed = 500;
+                temp = -temp;
+            }
+            uint8_t KL = (temp / 10) % 10, KR = temp % 10;
+            while (ledFreezerL.blink(speed, KL))
+            {
+            }
+            while (ledFridgeR.blink(speed, KR))
+            {
+            }
+        }
+        mode = MODE_NORMAL;
+    }
+    break;
     case MODE_SETUP_FRIDGE:
-        break;
+    {
+        int16_t temp = 0, range = 0;
+        bool rangeChanged = false;
+        while ((uint64_t)millis() - SetupTimer <= 5000)
+        {
+            ledFridgeR.blink(1000);
+            bool Pot2 = PotFreezerL.tick();
+            bool Pot1 = PotFridgeR.tick();
+            if (Pot1 || Pot2)
+            {
+                SetupTimer = millis();
+            }
+            temp = PotFridgeR.getValue();
+            if (Pot2)
+            {
+                ledFreezerL.blink(200);
+                range = map(PotFreezerL.getRawValue(), 0, 1023, TEMP_FRIDGE_MIN_RANGE, TEMP_FRIDGE_MAX_RANGE);
+                rangeChanged = 1;
+            }
+            if (!rangeChanged)
+            {
+                if (temp < tempFridge)
+                {
+                    compressor.setNow(1);
+                }
+                else
+                {
+                    compressor.setNow(0);
+                }
+            }
+        }
+        if (rangeChanged)
+        {
+            tempFreezerRange = range;
+            EE_tempFreezerRange.update();
+
+            uint16_t speed = 200;
+            if (range < 0)
+            {
+                speed = 500;
+                range = -range;
+            }
+            uint8_t KL = (range / 10) % 10, KR = range % 10;
+            while (ledFreezerL.blink(speed, KL))
+            {
+            }
+            while (ledFridgeR.blink(speed, KR))
+            {
+            }
+        }
+        else
+        {
+            tempFreezerReq = temp;
+            EE_tempFreezerReq.update();
+
+            uint16_t speed = 200;
+            if (temp < 0)
+            {
+                speed = 500;
+                temp = -temp;
+            }
+            uint8_t KL = (temp / 10) % 10, KR = temp % 10;
+            while (ledFreezerL.blink(speed, KL))
+            {
+            }
+            while (ledFridgeR.blink(speed, KR))
+            {
+            }
+        }
+        mode = MODE_NORMAL;
+    }
+    break;
     default:
     {
         if (freezerTest())
@@ -235,11 +387,11 @@ void loop()
 
             if (compressor.getState())
             {
-                ledFreezer.set(1);
+                ledFreezerL.set(1);
             }
             else
             {
-                ledFreezer.blink(1000);
+                ledFreezerL.blink(1000);
             }
         }
         else
@@ -254,7 +406,7 @@ void loop()
                     compressorTimerAutoChill = millis();
                 }
             }
-            ledFreezer.set(0);
+            ledFreezerL.set(0);
         }
         if (fridgeTest())
         {
@@ -262,11 +414,11 @@ void loop()
                 compressor.on();
             if (compressor.getState())
             {
-                ledFridge.set(1);
+                ledFridgeR.set(1);
             }
             else
             {
-                ledFridge.blink(1000);
+                ledFridgeR.blink(1000);
             }
         }
         else
@@ -281,7 +433,7 @@ void loop()
                 }
                 compressor.off();
             }
-            ledFridge.set(0);
+            ledFridgeR.set(0);
         }
         if ((uint64_t)(millis() - compressorTimerWork) >= MAX_WORK_TIME)
         {
