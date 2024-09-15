@@ -8,14 +8,14 @@
  *
  * @return The macro does not return a value.
  */
-#define TMR64(T, CODE)            \
-  {                               \
-    static uint64_t tmr##T = 0;   \
+#define TMR64(T, CODE)                      \
+  {                                         \
+    static uint64_t tmr##T = 0;             \
     if ((uint64_t)(millis() - tmr##T) >= T) \
-    {                             \
-      tmr##T = millis();          \
-      CODE                        \
-    }                             \
+    {                                       \
+      tmr##T = millis();                    \
+      CODE                                  \
+    }                                       \
   }
 
 /**
@@ -27,14 +27,14 @@
  *
  * @return The macro does not return a value.
  */
-#define TMR32(T, CODE)                        \
-  {                                           \
-    static uint32_t tmr##T = 0;               \
+#define TMR32(T, CODE)                                  \
+  {                                                     \
+    static uint32_t tmr##T = 0;                         \
     if ((uint32_t)(((uint32_t)millis()) - tmr##T) >= T) \
-    {                                         \
-      tmr##T = millis();                      \
-      CODE                                    \
-    }                                         \
+    {                                                   \
+      tmr##T = millis();                                \
+      CODE                                              \
+    }                                                   \
   }
 
 /**
@@ -46,14 +46,14 @@
  *
  * @return The macro does not return a value.
  */
-#define TMR16(T, CODE)                        \
-  {                                           \
-    static uint16_t tmr##T = 0;               \
+#define TMR16(T, CODE)                                  \
+  {                                                     \
+    static uint16_t tmr##T = 0;                         \
     if ((uint16_t)(((uint16_t)millis()) - tmr##T) >= T) \
-    {                                         \
-      tmr##T = millis();                      \
-      CODE                                    \
-    }                                         \
+    {                                                   \
+      tmr##T = millis();                                \
+      CODE                                              \
+    }                                                   \
   }
 
 /**
@@ -65,14 +65,14 @@
  *
  * @return The macro does not return a value.
  */
-#define TMR8(T, CODE)                        \
-  {                                          \
-    static uint8_t tmr##T = 0;               \
+#define TMR8(T, CODE)                                 \
+  {                                                   \
+    static uint8_t tmr##T = 0;                        \
     if ((uint8_t)(((uint8_t)millis()) - tmr##T) >= T) \
-    {                                        \
-      tmr##T = millis();                     \
-      CODE                                   \
-    }                                        \
+    {                                                 \
+      tmr##T = millis();                              \
+      CODE                                            \
+    }                                                 \
   }
 
 /**
@@ -84,14 +84,14 @@
  *
  * @return The macro does not return a value.
  */
-#define TMR8_S(T, CODE)                      \
-  {                                          \
-    static uint8_t tmr##T = 0;               \
+#define TMR8_S(T, CODE)                               \
+  {                                                   \
+    static uint8_t tmr##T = 0;                        \
     if ((uint8_t)(((uint8_t)millis()) - tmr##T) >= T) \
-    {                                        \
-      tmr##T += T;                           \
-      CODE                                   \
-    }                                        \
+    {                                                 \
+      tmr##T += T;                                    \
+      CODE                                            \
+    }                                                 \
   }
 
 /**
@@ -103,14 +103,14 @@
  *
  * @return The macro does not return a value.
  */
-#define TMR16_S(T, CODE)                      \
-  {                                           \
-    static uint16_t tmr##T = 0;               \
+#define TMR16_S(T, CODE)                                \
+  {                                                     \
+    static uint16_t tmr##T = 0;                         \
     if ((uint16_t)(((uint16_t)millis()) - tmr##T) >= T) \
-    {                                         \
-      tmr##T += T;                            \
-      CODE                                    \
-    }                                         \
+    {                                                   \
+      tmr##T += T;                                      \
+      CODE                                              \
+    }                                                   \
   }
 
 /**
@@ -122,14 +122,14 @@
  *
  * @return The macro does not return a value.
  */
-#define TMR32_S(T, CODE)                      \
-  {                                           \
-    static uint32_t tmr##T = 0;               \
+#define TMR32_S(T, CODE)                                \
+  {                                                     \
+    static uint32_t tmr##T = 0;                         \
     if ((uint32_t)(((uint32_t)millis()) - tmr##T) >= T) \
-    {                                         \
-      tmr##T += T;                            \
-      CODE                                    \
-    }                                         \
+    {                                                   \
+      tmr##T += T;                                      \
+      CODE                                              \
+    }                                                   \
   }
 
 /**
@@ -141,13 +141,13 @@
  *
  * @return The macro does not return a value.
  */
-#define TMR64_S(T, CODE)          \
-  {                               \
-    static uint64_t tmr##T = 0;   \
+#define TMR64_S(T, CODE)                    \
+  {                                         \
+    static uint64_t tmr##T = 0;             \
     if ((uint64_t)(millis() - tmr##T) >= T) \
-    {                             \
-      tmr##T += T;                \
-      CODE                        \
-    }                             \
+    {                                       \
+      tmr##T += T;                          \
+      CODE                                  \
+    }                                       \
   }
 //----------------------------------------------------------------

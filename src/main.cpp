@@ -8,33 +8,40 @@
 #define MY_DEBUG
 #include "My_Debug.h"
 
-#define PIN_SENS_FRIDGE 8
-#define PIN_SENS_FREEZER 9
+#define PIN_SENS_FRIDGE 2
+#define PIN_SENS_FREEZER 3
 
-#define PIN_RELAY 7
+#define PIN_COMPRESSOR 4
+#define PIN_NO_FROST 5
 
-#define PIN_LED_FRIDGE 10
-#define PIN_LED_FREEZER 11
+#define PIN_LED_FRIDGE 6
+#define PIN_LED_FREEZER 7
 
-#define PIN_POT_L 5
-#define PIN_POT_R 6
+#define PIN_POT_L 8
+#define PIN_POT_R 9
 
-#define NO_FROST_COMPRESSOR_OFF_TIME ((uint64_t)1000 * 60 * 60 * 2) // 2 часа
-// #define NO_FROST_EEPROM_TIME ((uint64_t)1000 * 60 * 60 * 24) // как часто писать в EEPROM время работы без NO_FROST
-// #define NO_FROST_MAX_FRIDGE_TEMPERATURE 10
-#define NO_FROST_ON_TRIGGER_DEFAULT -10
-#define NO_FROST_OFF_TRIGGER_DEFAULT 5
+#define NO_FROST_ON_TEMP_TRIGGER_DEFAULT -10
+#define NO_FROST_OFF_TEMP_TRIGGER 10
+#define NO_FROST_OFF_TEMP_FREEZER -6
+#define NO_FROST_ON_TIME 24    // часа
+#define NO_FROST_OFF_TIME 2    // часа
+#define NO_FROST_EEPROM_TIME 3 // часа
 
-#define MAX_WORK_TIME ((uint64_t)1000 * 60 * 60 * 4) // 3 часа работает
-#define BREAK_TIMER ((uint64_t)1000 * 60 * 20)       // Перерыв
+const uint64_t hour = (uint64_t)1000 * 60 * 60;
+
+uint16_t noFrostOnTimer, noFrostOffTimer, noFrostEEPROMTimer;
+EEManager EE_noFrostOnTimer(noFrostOnTimer);
+
+#define MAX_WORK_TIME ((uint64_t)1000 * 60 * 60 * 4) // 4 часа работает
+#define BREAK_TIME ((uint64_t)1000 * 60 * 20)        // Перерыв
 #define BREAK_RESET ((uint64_t)1000 * 60 * 10)       // Естесственный перерыв
 
-#define RELAY_CHANGE_TIMER ((uint64_t)1000 * 60 * 5) // Как часто можно переключать реле
+#define RELAY_CHANGE_TIME ((uint64_t)1000 * 60 * 5) // Как часто можно переключать реле
 
 #define TEMP_FREEZER_REQ_MIN -30
 #define TEMP_FREEZER_REQ_MAX -10
 #define TEMP_FREEZER_DEFAULT_RANGE 1
-#define TEMP_FREEZER_REQ_MAX_RANGE 5
+#define TEMP_FREEZER_REQ_MAX_RANGE 10
 #define TEMP_FREEZER_REQ_MIN_RANGE 1
 #define TEMP_FREEZER_EXTRA -5
 
@@ -44,37 +51,34 @@
 #define TEMP_FRIDGE_REQ_MAX_RANGE 10
 #define TEMP_FRIDGE_REQ_MIN_RANGE 1
 
+#define EEKEY 'b'
+
 GyverDS18Single sensorFridge(PIN_SENS_FRIDGE, 0);
 GyverDS18Single sensorFreezer(PIN_SENS_FREEZER, 0);
 
 Potentiometr PotFreezerL(PIN_POT_L, true, 20, TEMP_FREEZER_REQ_MIN, TEMP_FREEZER_REQ_MAX, 5, 200);
 Potentiometr PotFridgeR(PIN_POT_R, true, 20, TEMP_FRIDGE_REQ_MIN, TEMP_FRIDGE_REQ_MAX, 5, 200);
 
-Relay compressor(PIN_RELAY, 1, RELAY_CHANGE_TIMER);
-uint64_t compressorTimerWork = 0, compressorTimerChill = 0, compressorTimerAutoChill = 0;
+Relay relay_compressor(PIN_COMPRESSOR, 1, RELAY_CHANGE_TIME), relay_no_frost(PIN_NO_FROST, 10000);
+uint64_t TimerCompressorWork = 0, TimerChill = 0, TimerAutoChill = 0;
 bool chilling = 0;
 
 SimpleLed ledFridgeR(PIN_LED_FRIDGE);
 SimpleLed ledFreezerL(PIN_LED_FREEZER);
 
-uint64_t FrostWorkTime = 0, FrostWorkTimer = 0, NoFrostTimer = 0, SetupTimer = 0; ///
-bool noFrostState = 0;
-
-// EEManager EE_FrostWorkTime(FrostWorkTime, 60000);
-// EEManager EE_FrostWorkTimer(FrostWorkTimer, 60000);
-// EEManager EE_noFrostState(noFrostState, 60000);
+uint64_t SetupTimer = 0; ///
 
 int16_t tempFreezer = -99, tempFridge = -99,
         tempFreezerReq, tempFridgeReq,
         tempFridgeRange = TEMP_FRIDGE_DEFAULT_RANGE, tempFreezerRange = TEMP_FREEZER_DEFAULT_RANGE,
-        noFrostTrigger = NO_FROST_ON_TRIGGER_DEFAULT;
+        noFrostTempTrigger = NO_FROST_ON_TEMP_TRIGGER_DEFAULT;
 EEManager EE_tempFreezerRange(tempFreezerRange, 60000);
 EEManager EE_tempFridgeRange(tempFridgeRange, 60000);
 EEManager EE_tempFreezerReq(tempFreezerReq, 60000);
 EEManager EE_tempFridgeReq(tempFridgeReq, 60000);
-EEManager EE_noFrostTrigger(noFrostTrigger, 60000);
 
 uint8_t mode = 0;
+
 #define MODE_NORMAL 0
 #define MODE_NO_FROST 1
 #define MODE_SETUP_FREEZER 2
@@ -84,6 +88,8 @@ uint8_t mode = 0;
 
 void setup()
 {
+    relay_no_frost.off();
+    relay_compressor.off();
     delay(1000);
 #ifdef MY_DEBUG
     Serial.begin(115200);
@@ -93,32 +99,65 @@ void setup()
     tempFreezerReq = PotFreezerL.getValue();
     tempFridgeReq = PotFridgeR.getValue();
 
-    // EE_FrostWorkTime.begin(0, 'b');
-    // EE_noFrostState.begin(EE_FrostWorkTime.nextAddr(), 'b');
-    EE_tempFreezerRange.begin(0, 'b');
-    EE_tempFridgeRange.begin(EE_tempFreezerRange.nextAddr(), 'b');
-    EE_tempFridgeReq.begin(EE_tempFridgeRange.nextAddr(), 'b');
-    EE_tempFreezerReq.begin(EE_tempFridgeReq.nextAddr(), 'b');
-    EE_noFrostTrigger.begin(EE_tempFreezerReq.nextAddr(), 'b');
-
-    if (noFrostState)
-    {
-        mode = MODE_NO_FROST;
-    }
+    EE_noFrostOnTimer.begin(0, EEKEY);
+    EE_tempFreezerRange.begin(EE_noFrostOnTimer.nextAddr(), EEKEY);
+    EE_tempFridgeRange.begin(EE_tempFreezerRange.nextAddr(), EEKEY);
+    EE_tempFridgeReq.begin(EE_tempFridgeRange.nextAddr(), EEKEY);
+    EE_tempFreezerReq.begin(EE_tempFridgeReq.nextAddr(), EEKEY);
 
     sensorFridge.requestTemp();
     sensorFreezer.requestTemp();
+    while (!sensorFridge.ready())
+    {
+    }
+    if (sensorFridge.readTemp())
+    { // если чтение успешно
+        tempFridge = sensorFridge.getTempInt();
+    }
+    while (!sensorFreezer.ready())
+    {
+    }
+    if (sensorFreezer.readTemp())
+    {
+        tempFreezer = sensorFreezer.getTempInt();
+    }
+    sensorFridge.requestTemp();
+    sensorFreezer.requestTemp();
+
+    // if (tempFreezer > TEMP_FREEZER_EXTRA)
+    // {
+    //     mode = MODE_EXTRA;
+    // }
+    delay(20000); // задержка включения
 }
 
-bool freezerTest()
+/**
+ * @brief Checks if the temperature of the fridge is within the specified range or at the specified value.
+ *
+ * @param[in] req (optional) If true, checks if the temperature is equal to the specified value. If false, checks if the temperature is within the specified range.
+ * @return True if the temperature is within the specified range or at the specified value, false otherwise.
+ */
+bool freezerTest(bool req = 0)
 {
-    return (tempFreezer - tempFreezerReq) > tempFreezerRange;
+    if (req)
+        return tempFreezer <= tempFreezerReq;
+    return (tempFreezer - tempFreezerReq) <= tempFreezerRange;
 }
 
-bool fridgeTest()
+/**
+ * @brief Checks if the temperature of the fridge is within the specified range or at the specified value.
+ *
+ * @param[in] req (optional) If true, checks if the temperature is equal to the specified value. If false, checks if the temperature is within the specified range.
+ * @return True if the temperature is within the specified range or at the specified value, false otherwise.
+ */
+bool fridgeTest(bool req = 0)
 {
-    return (tempFridge - tempFridgeReq) > tempFridgeRange;
+    if (req)
+        return tempFridge <= tempFridgeReq;
+    return (tempFridge - tempFridgeReq) <= tempFridgeRange;
 }
+
+uint16_t error;
 
 void tempUpdate()
 {
@@ -130,6 +169,8 @@ void tempUpdate()
         }
         else
         {
+            tempFridge = tempFridgeReq;
+            error = 1;
             DD("Error sensorFridge.readTemp()  Loop");
         }
         sensorFridge.requestTemp(); // запрос следующего измерения
@@ -142,9 +183,19 @@ void tempUpdate()
         }
         else
         {
+            tempFreezer = tempFreezerReq;
+            error = 2;
             DD("Error sensorFreezer.readTemp()  Loop");
         }
         sensorFreezer.requestTemp(); // запрос следующего измерения
+    }
+    if (error == 1)
+    {
+        ledFridgeR.blink(100);
+    }
+    if (error == 2)
+    {
+        ledFreezerL.blink(100);
     }
 }
 void potAndModUpdate()
@@ -173,78 +224,159 @@ void potAndModUpdate()
         DD(")");
     }
 }
+
+void noFrostFunc()
+{
+    TMR64(hour, {
+        noFrostOnTimer++;
+        noFrostEEPROMTimer++;
+        DD("noFrostFunc hour timer");
+    });
+    if (noFrostOnTimer >= NO_FROST_ON_TIME && !relay_no_frost.getState())
+    {
+        // mode = MODE_NO_FROST;
+        DD("noFrostOnTimer >= NO_FROST_ON_TIME && !relay_no_frost.getState()");
+        noFrostOnTimer = 0;
+        noFrostOffTimer = 0;
+        relay_no_frost.on();
+    }
+    if (noFrostEEPROMTimer >= NO_FROST_EEPROM_TIME)
+    {
+        EE_noFrostOnTimer.update();
+        DD("noFrostEEPROMTimer >= NO_FROST_EEPROM_TIME");
+        noFrostEEPROMTimer = 0;
+    }
+
+    if (tempFridge <= NO_FROST_ON_TEMP_TRIGGER_DEFAULT)
+    {
+        DD("tempFridge <= NO_FROST_ON_TEMP_TRIGGER_DEFAULT");
+        noFrostOnTimer = 0;
+        noFrostOffTimer = 0;
+        relay_no_frost.on();
+    }
+    if (relay_no_frost.getState())
+    {
+        TMR64(hour, {
+            DD("noFrostOffTimer++");
+            noFrostOffTimer++;
+        });
+        if (noFrostOffTimer >= NO_FROST_OFF_TIME)
+        {
+            DD("noFrostOffTimer >= NO_FROST_OFF_TIME");
+            relay_no_frost.off();
+            noFrostOffTimer = 0;
+            noFrostOnTimer = 0;
+        }
+        if (tempFridge >= NO_FROST_OFF_TEMP_TRIGGER)
+        {
+            DD("tempFridge >= NO_FROST_OFF_TEMP_TRIGGER");
+            noFrostOnTimer = 0;
+            noFrostOffTimer = 0;
+            relay_no_frost.off();
+        }
+    }
+}
 bool flag = 0;
 void loop()
 {
-    // EE_FrostWorkTime.tick();
-    // EE_noFrostState.tick();
+    EE_noFrostOnTimer.tick();
     EE_tempFreezerRange.tick();
     EE_tempFridgeRange.tick();
-    EE_tempFreezerRange.tick();
     EE_tempFreezerReq.tick();
     EE_tempFridgeReq.tick();
-    EE_noFrostTrigger.tick();
-    // EE_FrostWorkTimer.tick();
-
-    // TMR64(NO_FROST_EEPROM_TIME,
-    //       {
-    //           FrostWorkTime += NO_FROST_EEPROM_TIME;
-    //           EE_FrostWorkTime.update();
-    //           DD("EE_FrostWorkTime.update");
-    //       });
-    // if ((uint64_t)(FrostWorkTime - FrostWorkTimer) >= NO_FROST_ON_TIME)
-    // {
-    //     FrostWorkTimer = FrostWorkTime;
-    //     // EE_FrostWorkTimer.update();
-    //     // DD("EE_FrostWorkTimer.update");
-    //     noFrostState = 1;
-    //     mode = MODE_NO_FROST;
-    //     NoFrostTimer = millis();
-    //     // EE_noFrostState.update();
-    //     // DD("EE_noFrostState.update");
-    // }
 
     tempUpdate();
     potAndModUpdate();
+
+    noFrostFunc();
     switch (mode)
     {
-    // case MODE_NO_FROST:
-    // {
-    //     while (noFrostState)
-    //     {
-    //         compressor.tick();
-    //         compressor.off();
-    //         ledFridgeR.blink(500);
-    //         ledFreezerL.blink(2000);
-    //         tempUpdate();
-    //         if ((tempFreezer >= NO_FROST_MAX_FREEZER_TEMPERATURE) || (tempFridge >= NO_FROST_MAX_FRIDGE_TEMPERATURE))
-    //         {
-    //             noFrostState = 0;
-    //         }
-    //         if ((uint64_t)(millis() - NoFrostTimer) >= NO_FROST_OFF_TIME)
-    //         {
-    //             noFrostState = 0;
-    //         }
-    //     }
-    //     mode = MODE_NORMAL;
-    //     DD("MODE_NORMAL");
-    //     // EE_noFrostState.update();
-    //     NoFrostTimer = millis();
-    //     FrostWorkTimer = millis();
-    //     FrostWorkTime = millis();
-    //     // EE_FrostWorkTime.update();
-    //     // EE_FrostWorkTimer.update();
-    // }
-    // break;
+
+    default:
+    {
+
+        if ((!fridgeTest() && !relay_no_frost.getState()) || (!freezerTest()))
+        {
+            if (!chilling)
+                relay_compressor.on();
+        }
+        if (!freezerTest())
+        {
+            if (relay_compressor.getState())
+            {
+                ledFreezerL.set(1);
+            }
+            else
+            {
+                ledFreezerL.blink(1000);
+            }
+        }
+        else
+        {
+            ledFreezerL.set(0);
+        }
+        if (!fridgeTest())
+        {
+            if (relay_compressor.getState())
+            {
+                ledFridgeR.set(1);
+            }
+            else
+            {
+                ledFridgeR.blink(1000);
+            }
+        }
+        else
+        {
+            ledFridgeR.set(0);
+        }
+        if (relay_compressor.getState())
+        {
+            if ((fridgeTest(1) || freezerTest(1)) && (fridgeTest() && freezerTest()))
+            {
+                relay_compressor.off();
+                ledFreezerL.set(0);
+                ledFridgeR.set(0);
+                TimerAutoChill = millis();
+            }
+            if (((uint64_t)((uint64_t)millis() - TimerCompressorWork) >= MAX_WORK_TIME) && !chilling)
+            {
+                chilling = 1;
+                relay_compressor.off();
+                TimerCompressorWork = millis() + BREAK_TIME;
+                TimerChill = millis();
+            }
+        }
+        else
+        {
+            if (chilling && ((uint64_t)((uint64_t)millis() - TimerChill) >= BREAK_TIME))
+            {
+                chilling = 0;
+                TimerAutoChill = millis();
+                TimerChill = millis();
+                TimerCompressorWork = millis();
+            }
+            if (!chilling && ((uint64_t)((uint64_t)millis() - TimerAutoChill) >= BREAK_RESET))
+            {
+                TimerAutoChill = millis();
+                TimerChill = millis();
+                TimerCompressorWork = millis();
+            }
+        }
+    }
+
+    break;
+
     case MODE_SETUP_FREEZER:
     {
         int16_t temp = 0, range = 0;
         bool rangeChanged = false;
         while ((uint64_t)millis() - SetupTimer <= 5000)
         {
-            ledFreezerL.blink(1000);
             bool Pot1 = PotFreezerL.tick();
             bool Pot2 = PotFridgeR.tick();
+            uint16_t speedBlinkL = map(PotFreezerL.getRawValue(), 0, 1023, 1000, 100);
+            ledFreezerL.blink(speedBlinkL);
             if (Pot1 || Pot2)
             {
                 SetupTimer = millis();
@@ -252,7 +384,8 @@ void loop()
             temp = PotFreezerL.getValue();
             if (Pot2)
             {
-                ledFridgeR.blink(200);
+                uint16_t speedBlinkR = map(PotFridgeR.getRawValue(), 0, 1023, 1000, 100);
+                ledFridgeR.blink(speedBlinkR);
                 range = map(PotFridgeR.getRawValue(), 0, 1023, TEMP_FREEZER_REQ_MIN_RANGE, TEMP_FREEZER_REQ_MAX_RANGE);
                 rangeChanged = 1;
             }
@@ -260,35 +393,40 @@ void loop()
             {
                 if (temp < tempFreezer)
                 {
-                    compressor.setNow(1);
+                    relay_compressor.setNow(1);
                 }
                 else
                 {
-                    compressor.setNow(0);
+                    relay_compressor.setNow(0);
                 }
             }
         }
+        ledFreezerL.set(0);
+        ledFridgeR.set(0);
+        delay(2000);
         if (rangeChanged)
         {
             tempFreezerRange = range;
+            DDD("rangeChanged: ");
+            DD(tempFreezerRange);
             EE_tempFreezerRange.update();
-            uint16_t speed = 200;
-            if (range < 0)
-            {
-                speed = 500;
-                range = -range;
-            }
+            uint16_t speed = 500;
+
             uint8_t KL = (range / 10) % 10, KR = range % 10;
             while (ledFreezerL.blink(speed, KL))
             {
+                DD("rangeChanged: ledFreezerL.blink(speed, KL)", 1000);
             }
             while (ledFridgeR.blink(speed, KR))
             {
+                DD("rangeChanged: ledFridgeR.blink(speed, KR)", 1000);
             }
         }
         else
         {
             tempFreezerReq = temp;
+            DDD("tempFreezerReq: ");
+            DD(tempFreezerReq);
             EE_tempFreezerReq.update();
             uint16_t speed = 200;
             if (temp < 0)
@@ -299,23 +437,28 @@ void loop()
             uint8_t KL = (temp / 10) % 10, KR = temp % 10;
             while (ledFreezerL.blink(speed, KL))
             {
+                DD("tempFreezerReq: ledFreezerL.blink(speed, KL)", 1000);
             }
             while (ledFridgeR.blink(speed, KR))
             {
+                DD("tempFreezerReq: ledFridgeR.blink(speed, KR)", 1000);
             }
         }
         mode = MODE_NORMAL;
     }
     break;
+
     case MODE_SETUP_FRIDGE:
     {
         int16_t temp = 0, range = 0;
         bool rangeChanged = false;
         while ((uint64_t)millis() - SetupTimer <= 5000)
         {
-            ledFridgeR.blink(1000);
+
             bool Pot2 = PotFreezerL.tick();
             bool Pot1 = PotFridgeR.tick();
+            uint16_t speedBlinkR = map(PotFridgeR.getRawValue(), 0, 1023, 1000, 100);
+            ledFridgeR.blink(speedBlinkR);
             if (Pot1 || Pot2)
             {
                 SetupTimer = millis();
@@ -323,7 +466,8 @@ void loop()
             temp = PotFridgeR.getValue();
             if (Pot2)
             {
-                ledFreezerL.blink(200);
+                uint16_t speedBlinkL = map(PotFreezerL.getRawValue(), 0, 1023, 1000, 100);
+                ledFreezerL.blink(speedBlinkL);
                 range = map(PotFreezerL.getRawValue(), 0, 1023, TEMP_FRIDGE_REQ_MIN_RANGE, TEMP_FRIDGE_REQ_MAX_RANGE);
                 rangeChanged = 1;
             }
@@ -331,36 +475,41 @@ void loop()
             {
                 if (temp < tempFridge)
                 {
-                    compressor.setNow(1);
+                    relay_compressor.setNow(1);
                 }
                 else
                 {
-                    compressor.setNow(0);
+                    relay_compressor.setNow(0);
                 }
             }
         }
+        ledFreezerL.set(0);
+        ledFridgeR.set(0);
+        delay(2000);
         if (rangeChanged)
         {
             tempFridgeRange = range;
+            DDD("rangeChanged: ");
+            DD(tempFridgeRange);
             EE_tempFridgeRange.update();
 
-            uint16_t speed = 200;
-            if (range < 0)
-            {
-                speed = 500;
-                range = -range;
-            }
+            uint16_t speed = 500;
+
             uint8_t KL = (range / 10) % 10, KR = range % 10;
             while (ledFreezerL.blink(speed, KL))
             {
+                DD("rangeChanged: ledFreezerL.blink(speed, KL)", 1000);
             }
             while (ledFridgeR.blink(speed, KR))
             {
+                DD("rangeChanged: ledFridgeR.blink(speed, KR)", 1000);
             }
         }
         else
         {
             tempFridgeReq = temp;
+            DDD("tempFridgeReq: ");
+            DD(tempFridgeReq);
             EE_tempFridgeReq.update();
 
             uint16_t speed = 200;
@@ -372,86 +521,14 @@ void loop()
             uint8_t KL = (temp / 10) % 10, KR = temp % 10;
             while (ledFreezerL.blink(speed, KL))
             {
+                DD("tempFridgeReq: ledFreezerL.blink(speed, KL)", 1000);
             }
             while (ledFridgeR.blink(speed, KR))
             {
+                DD("tempFridgeReq: ledFridgeR.blink(speed, KR)", 1000);
             }
         }
         mode = MODE_NORMAL;
-    }
-    break;
-    default:
-    {
-        if (freezerTest())
-        {
-            if (!chilling)
-                compressor.on();
-
-            if (compressor.getState())
-            {
-                ledFreezerL.set(1);
-                flag = 1;
-            }
-            else
-            {
-                ledFreezerL.blink(1000);
-            }
-        }
-        else
-        {
-            if (!fridgeTest())
-            {
-                compressor.off();
-                if (flag)
-                {
-                    flag = 0;
-                    compressorTimerAutoChill = millis();
-                }
-            }
-            ledFreezerL.set(0);
-        }
-        if (fridgeTest())
-        {
-            if (!chilling)
-                compressor.on();
-            if (compressor.getState())
-            {
-                ledFridgeR.set(1);
-                flag = 1;
-            }
-            else
-            {
-                ledFridgeR.blink(1000);
-            }
-        }
-        else
-        {
-            if (!freezerTest())
-            {
-                if (flag)
-                {
-                    flag = 0;
-                    compressorTimerAutoChill = millis();
-                }
-                compressor.off();
-            }
-            ledFridgeR.set(0);
-        }
-        if (((uint64_t)(millis() - compressorTimerWork) >= MAX_WORK_TIME) && !chilling)
-        {
-            chilling = 1;
-            // compressorTimerWork = millis() + BREAK_TIMER;
-            compressorTimerChill = millis();
-        }
-        if (chilling && ((uint64_t)(millis() - compressorTimerChill) >= BREAK_TIMER))
-        {
-            chilling = 0;
-            compressorTimerWork = millis();
-        }
-        if (!compressor.getState() && !chilling && ((uint64_t)(millis() - compressorTimerAutoChill) >= BREAK_RESET))
-        {
-            compressorTimerWork = millis();
-        }
     }
     break;
     }
