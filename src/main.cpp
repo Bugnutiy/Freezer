@@ -1,12 +1,13 @@
 #include <Arduino.h>
-#include "Timer.h"
-#include "GyverDS18Single.h"
+#include <GyverDS18Single.h>
 #include "Relay.h"
 #include "Potentiometr.h"
 #include "SimpleLed.h"
 #include <EEManager.h>
+#include <GyverButton.h>
 #define MY_DEBUG
 #include "My_Debug.h"
+#include "Timer.h"
 
 #define PIN_SENS_FRIDGE 2
 #define PIN_SENS_FREEZER 3
@@ -17,10 +18,13 @@
 #define PIN_LED_FRIDGE 6
 #define PIN_LED_FREEZER 7
 
-#define PIN_POT_L 8
-#define PIN_POT_R 9
+#define PIN_POT_L A0
+#define PIN_POT_R A1
+#define PIN_BUTTON 10
 
 #define NO_FROST_ON_TEMP_TRIGGER_DEFAULT -10
+#define NO_FROST_ON_TEMP_TRIGGER_MAX 5
+#define NO_FROST_ON_TEMP_TRIGGER_MIN -10
 #define NO_FROST_OFF_TEMP_TRIGGER 10
 #define NO_FROST_OFF_TEMP_FREEZER -6
 #define NO_FROST_ON_TIME 24    // часа
@@ -30,7 +34,9 @@
 const uint64_t hour = (uint64_t)1000 * 60 * 60;
 
 uint16_t noFrostOnTimer, noFrostOffTimer, noFrostEEPROMTimer;
-EEManager EE_noFrostOnTimer(noFrostOnTimer);
+int16_t noFrostOnTempTrigger = NO_FROST_ON_TEMP_TRIGGER_DEFAULT;
+EEManager EE_noFrostOnTimer(noFrostOnTimer, 60000);
+EEManager EE_noFrostOnTempTrigger(noFrostOnTempTrigger, 60000);
 
 #define MAX_WORK_TIME ((uint64_t)1000 * 60 * 60 * 4) // 4 часа работает
 #define BREAK_TIME ((uint64_t)1000 * 60 * 20)        // Перерыв
@@ -51,10 +57,11 @@ EEManager EE_noFrostOnTimer(noFrostOnTimer);
 #define TEMP_FRIDGE_REQ_MAX_RANGE 10
 #define TEMP_FRIDGE_REQ_MIN_RANGE 1
 
-#define EEKEY 'b'
+#define EEKEY 'c'
 
 GyverDS18Single sensorFridge(PIN_SENS_FRIDGE, 0);
 GyverDS18Single sensorFreezer(PIN_SENS_FREEZER, 0);
+GButton button(PIN_BUTTON);
 
 Potentiometr PotFreezerL(PIN_POT_L, true, 20, TEMP_FREEZER_REQ_MIN, TEMP_FREEZER_REQ_MAX, 5, 200);
 Potentiometr PotFridgeR(PIN_POT_R, true, 20, TEMP_FRIDGE_REQ_MIN, TEMP_FRIDGE_REQ_MAX, 5, 200);
@@ -65,6 +72,7 @@ bool chilling = 0;
 
 SimpleLed ledFridgeR(PIN_LED_FRIDGE);
 SimpleLed ledFreezerL(PIN_LED_FREEZER);
+SimpleLed ledBuiltin(13);
 
 uint64_t SetupTimer = 0; ///
 
@@ -90,6 +98,10 @@ void setup()
 {
     relay_no_frost.off();
     relay_compressor.off();
+    button.setDebounce(100);
+    button.setDirection(NORM_OPEN);
+    button.setTickMode(1);
+    button.setType(HIGH_PULL);
     delay(1000);
 #ifdef MY_DEBUG
     Serial.begin(115200);
@@ -98,44 +110,75 @@ void setup()
     PotFridgeR.tick();
     tempFreezerReq = PotFreezerL.getValue();
     tempFridgeReq = PotFridgeR.getValue();
-
-    EE_noFrostOnTimer.begin(0, EEKEY);
-    EE_tempFreezerRange.begin(EE_noFrostOnTimer.nextAddr(), EEKEY);
-    EE_tempFridgeRange.begin(EE_tempFreezerRange.nextAddr(), EEKEY);
-    EE_tempFridgeReq.begin(EE_tempFridgeRange.nextAddr(), EEKEY);
-    EE_tempFreezerReq.begin(EE_tempFridgeReq.nextAddr(), EEKEY);
-
     sensorFridge.requestTemp();
     sensorFreezer.requestTemp();
+
     while (!sensorFridge.ready())
     {
+        ledBuiltin.blink(1000);
+        ledFridgeR.blink(1000);
+        DD("Waiting for sensorFridge to be ready", 20000);
     }
     if (sensorFridge.readTemp())
     { // если чтение успешно
         tempFridge = sensorFridge.getTempInt();
+        DDD("SensorFridge: ");
+        DD(tempFridge);
     }
     while (!sensorFreezer.ready())
     {
+        ledBuiltin.blink(500);
+        ledFreezerL.blink(1000);
+        DD("Waiting for sensorFreezer to be ready", 20000);
     }
     if (sensorFreezer.readTemp())
     {
         tempFreezer = sensorFreezer.getTempInt();
+        DDD("SensorFreezer: ");
+        DD(tempFreezer);
     }
+
+    EE_noFrostOnTimer.begin(0, EEKEY);
+    EE_noFrostOnTempTrigger.begin(EE_noFrostOnTimer.nextAddr(), EEKEY);
+    EE_tempFreezerRange.begin(EE_noFrostOnTempTrigger.nextAddr(), EEKEY);
+    EE_tempFridgeRange.begin(EE_tempFreezerRange.nextAddr(), EEKEY);
+    EE_tempFridgeReq.begin(EE_tempFridgeRange.nextAddr(), EEKEY);
+    EE_tempFreezerReq.begin(EE_tempFridgeReq.nextAddr(), EEKEY);
+
+    DD("EEPROM initialized");
     sensorFridge.requestTemp();
     sensorFreezer.requestTemp();
 
-    // if (tempFreezer > TEMP_FREEZER_EXTRA)
-    // {
-    //     mode = MODE_EXTRA;
-    // }
-    delay(20000); // задержка включения
+    DD("Setup is DONE!");
+    DDD("noFrostOnTimer: ");
+    DD(noFrostOnTimer);
+    DDD("noFrostOnTempTrigger: ");
+    DD(noFrostOnTempTrigger);
+    DDD("tempFreezerRange: ");
+    DD(tempFreezerRange);
+    DDD("tempFridgeRange: ");
+    DD(tempFridgeRange);
+    DDD("tempFreezerReq: ");
+    DD(tempFreezerReq);
+    DDD("tempFridgeReq: ");
+    DD(tempFridgeReq);
+
+    ledBuiltin.set(0);
+    ledFridgeR.set(0);
+
+    DD("Waiting 20s before starting");
+    while (millis() < 20000)
+    {
+        ledFreezerL.blink(2000);
+    }
+    ledFreezerL.set(0);
 }
 
 /**
  * @brief Checks if the temperature of the fridge is within the specified range or at the specified value.
  *
- * @param[in] req (optional) If true, checks if the temperature is equal to the specified value. If false, checks if the temperature is within the specified range.
- * @return True if the temperature is within the specified range or at the specified value, false otherwise.
+ * @param[in] req (optional) If true, checks if the temperature is less then the specified value. If false, checks if the temperature is within the specified range.
+ * @return True if the temperature is within the specified range or less then the specified value, false otherwise.
  */
 bool freezerTest(bool req = 0)
 {
@@ -147,8 +190,8 @@ bool freezerTest(bool req = 0)
 /**
  * @brief Checks if the temperature of the fridge is within the specified range or at the specified value.
  *
- * @param[in] req (optional) If true, checks if the temperature is equal to the specified value. If false, checks if the temperature is within the specified range.
- * @return True if the temperature is within the specified range or at the specified value, false otherwise.
+ * @param[in] req (optional) If true, checks if the temperature is less then the specified value. If false, checks if the temperature is within the specified range.
+ * @return True if the temperature is within the specified range or less then the specified value, false otherwise.
  */
 bool fridgeTest(bool req = 0)
 {
@@ -157,7 +200,7 @@ bool fridgeTest(bool req = 0)
     return (tempFridge - tempFridgeReq) <= tempFridgeRange;
 }
 
-uint16_t error;
+uint8_t error;
 
 void tempUpdate()
 {
@@ -274,12 +317,89 @@ void noFrostFunc()
             noFrostOffTimer = 0;
             relay_no_frost.off();
         }
+        if (tempFreezer >= NO_FROST_OFF_TEMP_FREEZER)
+        {
+            DD("tempFreezer >= NO_FROST_OFF_TEMP_FREEZER");
+            noFrostOnTimer = 0;
+            noFrostOffTimer = 0;
+            relay_no_frost.off();
+        }
     }
 }
+
+void ButtonHold()
+{
+    DD("Extra button holded");
+
+    while (button.state())
+    {
+        DD("Extra Button hold", 20000);
+        relay_compressor.setNow(1);
+        potAndModUpdate();
+        if (mode == MODE_SETUP_FREEZER)
+        {
+            int16_t temp = 0;
+            while ((uint64_t)millis() - SetupTimer <= 5000)
+            {
+                DD("Setting up noFrostOnTriggerTemp", 1000);
+                bool Pot1 = PotFreezerL.tick();
+                bool Pot2 = PotFridgeR.tick();
+                uint16_t speedBlinkL = map(PotFreezerL.getRawValue(), 0, 1023, 1000, 100);
+                ledFreezerL.blink(speedBlinkL);
+                if (Pot1 || Pot2)
+                {
+                    SetupTimer = millis();
+                }
+                if (Pot1)
+                {
+                    temp = map(PotFreezerL.getRawValue(), 0, 1023, NO_FROST_ON_TEMP_TRIGGER_MIN, NO_FROST_ON_TEMP_TRIGGER_MAX);
+                    DDD("temp: ", 500);
+                    DD(temp, 500);
+                }
+            }
+            if (noFrostOnTempTrigger != temp)
+            {
+                noFrostOnTempTrigger = temp;
+                EE_noFrostOnTempTrigger.update();
+            }
+            DDD("noFrostOnTempTrigger: ");
+            DD(noFrostOnTempTrigger);
+            ledFreezerL.set(0);
+            ledFridgeR.set(0);
+            delay(2000);
+            uint16_t speed = 200;
+            if (temp < 0)
+            {
+                speed = 500;
+                temp = -temp;
+            }
+            uint8_t KL = (temp / 10) % 10, KR = temp % 10;
+            while (ledFreezerL.blink(speed, KL))
+            {
+                DD("tempFreezerReq: ledFreezerL.blink(speed, KL)", 1000);
+            }
+            while (ledFridgeR.blink(speed, KR))
+            {
+                DD("tempFreezerReq: ledFridgeR.blink(speed, KR)", 1000);
+            }
+            delay(1000);
+            ledFreezerL.set(1);
+            ledFridgeR.set(1);
+            delay(100);
+            ledFreezerL.set(0);
+            ledFridgeR.set(0);
+            mode = MODE_NORMAL;
+        }
+    }
+    mode = MODE_NORMAL;
+}
+
 bool flag = 0;
 void loop()
 {
+    // ledBuiltin.blink(1000);
     EE_noFrostOnTimer.tick();
+    EE_noFrostOnTempTrigger.tick();
     EE_tempFreezerRange.tick();
     EE_tempFridgeRange.tick();
     EE_tempFreezerReq.tick();
@@ -287,8 +407,11 @@ void loop()
 
     tempUpdate();
     potAndModUpdate();
-
     noFrostFunc();
+    if (button.state())
+    {
+        ButtonHold();
+    }
     switch (mode)
     {
 
@@ -373,6 +496,7 @@ void loop()
         bool rangeChanged = false;
         while ((uint64_t)millis() - SetupTimer <= 5000)
         {
+            DD("Setting up Freezer...", 1000);
             bool Pot1 = PotFreezerL.tick();
             bool Pot2 = PotFridgeR.tick();
             uint16_t speedBlinkL = map(PotFreezerL.getRawValue(), 0, 1023, 1000, 100);
@@ -421,6 +545,12 @@ void loop()
             {
                 DD("rangeChanged: ledFridgeR.blink(speed, KR)", 1000);
             }
+            delay(1000);
+            ledFreezerL.set(1);
+            ledFridgeR.set(1);
+            delay(100);
+            ledFreezerL.set(0);
+            ledFridgeR.set(0);
         }
         else
         {
@@ -443,6 +573,12 @@ void loop()
             {
                 DD("tempFreezerReq: ledFridgeR.blink(speed, KR)", 1000);
             }
+            delay(1000);
+            ledFreezerL.set(1);
+            ledFridgeR.set(1);
+            delay(100);
+            ledFreezerL.set(0);
+            ledFridgeR.set(0);
         }
         mode = MODE_NORMAL;
     }
@@ -504,6 +640,12 @@ void loop()
             {
                 DD("rangeChanged: ledFridgeR.blink(speed, KR)", 1000);
             }
+            delay(1000);
+            ledFreezerL.set(1);
+            ledFridgeR.set(1);
+            delay(100);
+            ledFreezerL.set(0);
+            ledFridgeR.set(0);
         }
         else
         {
@@ -527,6 +669,12 @@ void loop()
             {
                 DD("tempFridgeReq: ledFridgeR.blink(speed, KR)", 1000);
             }
+            delay(1000);
+            ledFreezerL.set(1);
+            ledFridgeR.set(1);
+            delay(100);
+            ledFreezerL.set(0);
+            ledFridgeR.set(0);
         }
         mode = MODE_NORMAL;
     }

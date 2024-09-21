@@ -1,13 +1,14 @@
 #pragma once
 #include <Arduino.h>
 
-#include "Timer.h"
+// #include "Timer.h"
 
 class SimpleLed
 {
 private:
     uint8_t _pin;
     bool _state;
+    uint16_t _tmr_blink_time, _blink_i;
 
 public:
     SimpleLed(uint8_t pin);
@@ -45,26 +46,29 @@ SimpleLed::~SimpleLed()
 
 bool SimpleLed::blink(uint16_t blink_time)
 {
-    TMR16(blink_time, {
+    if ((uint16_t)millis() - _tmr_blink_time >= blink_time)
+    {
+        _tmr_blink_time += blink_time;
         toggle();
-    });
+        _blink_i=0;
+    }
     return _state;
 }
 
 bool SimpleLed::blink(uint16_t blink_time, uint16_t k)
 {
-    static uint16_t i = 0;
-    if (i >= k)
+    if (_blink_i == k)
     {
-        i = 0;
+        _blink_i = 0;
         return false;
     }
-    TMR16(blink_time, {
+    if ((uint16_t)millis() - _tmr_blink_time >= blink_time)
+    {
+        _tmr_blink_time += blink_time;
+
         toggle();
         if (!_state)
-        {
-            i++;
-        }
-    });
+            _blink_i++;
+    }
     return true;
 }

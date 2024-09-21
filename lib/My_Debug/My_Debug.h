@@ -3,16 +3,6 @@
 // #define MY_DEBUG
 // #define MY_DEBUG_LED 1000
 
-#ifdef MY_DEBUG_LED
-#define DD_LED(X)                           \
-  {                                         \
-    SHOW_NUM_L(l_led, (X / 10) % 10, mRed); \
-    SHOW_NUM_R(r_led, X % 10, mRed);        \
-    delay(MY_DEBUG_LED);                    \
-  }
-#else
-#define DD_LED(X)
-#endif
 
 #ifdef MY_DEBUG
 
@@ -20,7 +10,7 @@
 #define DDD_1(X) Serial.print(X)
 #define DD_2(X, T)                          \
   {                                         \
-    static uint16_t TMR##T;                 \
+    static uint16_t TMR##T = 0;                 \
     if ((uint16_t)(millis() - TMR##T) >= T) \
     {                                       \
       TMR##T = millis();                    \
@@ -29,7 +19,7 @@
   }
 #define DDD_2(X, T)                         \
   {                                         \
-    static uint16_t TMR##T;                 \
+    static uint16_t TMR##T = 0;                 \
     if ((uint16_t)(millis() - TMR##T) >= T) \
     {                                       \
       TMR##T = millis();                    \
@@ -39,7 +29,7 @@
 
 #define DD_3(X, Y, T)                       \
   {                                         \
-    static uint16_t TMR##T;                 \
+    static uint16_t TMR##T = 0;                 \
     if ((uint16_t)(millis() - TMR##T) >= T) \
     {                                       \
       TMR##T = millis();                    \
@@ -48,7 +38,7 @@
   }
 #define DDD_3(X, Y, T)                      \
   {                                         \
-    static uint16_t TMR##T;                 \
+    static uint16_t TMR##T = 0;                 \
     if ((uint16_t)(millis() - TMR##T) >= T) \
     {                                       \
       TMR##T = millis();                    \

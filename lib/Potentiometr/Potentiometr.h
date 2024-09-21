@@ -41,6 +41,8 @@ Potentiometr::Potentiometr(uint8_t pin, bool direction, uint16_t K_Reads, uint16
     _map_max = map_max;
     _treshold = treshold;
     _changeTime = changeTime;
+    pinMode(_pin, INPUT_PULLUP);
+    // pinMode(_pin, INPUT);
 }
 
 Potentiometr::~Potentiometr()
@@ -80,7 +82,6 @@ bool Potentiometr::tick()
     }
     return false;
 }
-
 
 uint16_t Potentiometr::getValue()
 {

@@ -139,11 +139,11 @@ bool Relay::off()
 
 void Relay::_setState(bool state, bool now)
 {
-    if (!_min_change_time)
-    {
-        _state = state ^ !_truth;
-        digitalWrite(_pin, _state);
-    }
+    // if (!_min_change_time)
+    // {
+    //     _state = state ^ !_truth;
+    //     digitalWrite(_pin, _state);
+    // }
     if (ready() || now)
     {
         _state = state ^ !_truth;
