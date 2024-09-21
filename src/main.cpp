@@ -209,6 +209,8 @@ void tempUpdate()
         if (sensorFridge.readTemp())
         { // если чтение успешно
             tempFridge = sensorFridge.getTempInt();
+            DDD("tempFridge:", 1000);
+            DD(tempFridge, 1000);
         }
         else
         {
@@ -223,6 +225,8 @@ void tempUpdate()
         if (sensorFreezer.readTemp())
         { // если чтение успешно
             tempFreezer = sensorFreezer.getTempInt();
+            DDD("tempFreezer: ", 1000);
+            DD(tempFreezer, 1000);
         }
         else
         {
