@@ -166,12 +166,13 @@ void setup()
     ledBuiltin.set(0);
     ledFridgeR.set(0);
 
-    DD("Waiting 20s before starting");
     while (millis() < 20000)
     {
         ledFreezerL.blink(2000);
+        DD("Waiting 20s before starting", 1000);
     }
     ledFreezerL.set(0);
+    DD("Starting...");
 }
 
 /**
@@ -397,6 +398,7 @@ void ButtonHold()
             mode = MODE_NORMAL;
         }
     }
+    DD("Extra button released");
     mode = MODE_NORMAL;
 }
 
