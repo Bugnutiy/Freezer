@@ -66,7 +66,7 @@ GButton button(PIN_BUTTON);
 Potentiometr PotFreezerL(PIN_POT_L, true, 20, TEMP_FREEZER_REQ_MIN, TEMP_FREEZER_REQ_MAX, 5, 200);
 Potentiometr PotFridgeR(PIN_POT_R, true, 20, TEMP_FRIDGE_REQ_MIN, TEMP_FRIDGE_REQ_MAX, 5, 200);
 
-Relay relay_compressor(PIN_COMPRESSOR, 1, RELAY_CHANGE_TIME), relay_no_frost(PIN_NO_FROST, 10000);
+Relay relay_compressor(PIN_COMPRESSOR, 1, RELAY_CHANGE_TIME), relay_no_frost(PIN_NO_FROST, 1, 10000);
 uint64_t TimerCompressorWork = 0, TimerChill = 0, TimerAutoChill = 0;
 bool chilling = 0;
 
@@ -333,8 +333,10 @@ void ButtonHold()
 
     while (button.state())
     {
+        ledFreezerL.blink(200);
+        ledFridgeR.blink(200);
         DD("Extra Button hold", 20000);
-        relay_compressor.setNow(1);
+        relay_compressor.set(1);
         potAndModUpdate();
         if (mode == MODE_SETUP_FREEZER)
         {

@@ -10,7 +10,7 @@
 #define DDD_1(X) Serial.print(X)
 #define DD_2(X, T)                          \
   {                                         \
-    static uint16_t TMR##T = 0;                 \
+    static uint16_t TMR##T = -T;                 \
     if ((uint16_t)(millis() - TMR##T) >= T) \
     {                                       \
       TMR##T = millis();                    \
@@ -19,7 +19,7 @@
   }
 #define DDD_2(X, T)                         \
   {                                         \
-    static uint16_t TMR##T = 0;                 \
+    static uint16_t TMR##T = -T;                 \
     if ((uint16_t)(millis() - TMR##T) >= T) \
     {                                       \
       TMR##T = millis();                    \
@@ -29,7 +29,7 @@
 
 #define DD_3(X, Y, T)                       \
   {                                         \
-    static uint16_t TMR##T = 0;                 \
+    static uint16_t TMR##T = -T;                 \
     if ((uint16_t)(millis() - TMR##T) >= T) \
     {                                       \
       TMR##T = millis();                    \
@@ -38,7 +38,7 @@
   }
 #define DDD_3(X, Y, T)                      \
   {                                         \
-    static uint16_t TMR##T = 0;                 \
+    static uint16_t TMR##T = -T;                 \
     if ((uint16_t)(millis() - TMR##T) >= T) \
     {                                       \
       TMR##T = millis();                    \
