@@ -352,6 +352,7 @@ void ButtonHold()
         potAndModUpdate();
         if (mode == MODE_SETUP_FREEZER)
         {
+            ledFridgeR.set(0);
             int16_t temp = 0;
             while ((uint64_t)millis() - SetupTimer <= 5000)
             {
@@ -381,17 +382,14 @@ void ButtonHold()
             ledFreezerL.set(0);
             ledFridgeR.set(0);
             delay(2000);
-            uint16_t speed = 1000;
+            uint16_t speed = 500;
             if (temp < 0)
             {
-                speed = 2000;
+                speed = 1000;
                 temp = -temp;
             }
             uint8_t KL = (temp / 10) % 10, KR = temp % 10;
-            DDD("KL: ");
-            DD(KL);
-            DDD("KR: ");
-            DD(KR);
+
             while (ledFreezerL.blink(speed, KL))
             {
                 DD("tempFreezerReq: ledFreezerL.blink(speed, KL)", 1000);
@@ -400,7 +398,7 @@ void ButtonHold()
             {
                 DD("tempFreezerReq: ledFridgeR.blink(speed, KR)", 1000);
             }
-            delay(1000);
+            delay(2000);
             ledFreezerL.set(1);
             ledFridgeR.set(1);
             delay(100);
@@ -513,6 +511,7 @@ void loop()
     {
         int16_t temp = 0, range = 0;
         bool rangeChanged = false;
+        ledFridgeR.set(0);
         while ((uint64_t)millis() - SetupTimer <= 5000)
         {
             DD("Setting up Freezer...", 1000);
@@ -556,10 +555,7 @@ void loop()
             uint16_t speed = 500;
 
             uint8_t KL = (range / 10) % 10, KR = range % 10;
-            DDD("KL: ");
-            DD(KL);
-            DDD("KR: ");
-            DD(KR);
+
             while (ledFreezerL.blink(speed, KL))
             {
                 DD("rangeChanged: ledFreezerL.blink(speed, KL)", 1000);
@@ -574,6 +570,7 @@ void loop()
             delay(100);
             ledFreezerL.set(0);
             ledFridgeR.set(0);
+            delay(1000);
         }
         else
         {
@@ -581,17 +578,14 @@ void loop()
             DDD("tempFreezerReq: ");
             DD(tempFreezerReq);
             EE_tempFreezerReq.update();
-            uint16_t speed = 200;
+            uint16_t speed = 500;
             if (temp < 0)
             {
-                speed = 500;
+                speed = 1000;
                 temp = -temp;
             }
             uint8_t KL = (temp / 10) % 10, KR = temp % 10;
-            DDD("KL: ");
-            DD(KL);
-            DDD("KR: ");
-            DD(KR);
+
             while (ledFreezerL.blink(speed, KL))
             {
                 DD("tempFreezerReq: ledFreezerL.blink(speed, KL)", 1000);
@@ -606,6 +600,7 @@ void loop()
             delay(100);
             ledFreezerL.set(0);
             ledFridgeR.set(0);
+            delay(1000);
         }
         mode = MODE_NORMAL;
     }
@@ -615,6 +610,7 @@ void loop()
     {
         int16_t temp = 0, range = 0;
         bool rangeChanged = false;
+        ledFreezerL.set(0);
         while ((uint64_t)millis() - SetupTimer <= 5000)
         {
 
