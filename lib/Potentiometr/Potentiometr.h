@@ -1,20 +1,20 @@
 #pragma once
 #include <Arduino.h>
-
+#include "My_Debug.h"
 class Potentiometr
 {
 private:
     uint8_t _pin;
-    bool _direction;
-    uint16_t _map_min, _map_max;
-    uint16_t _treshold, _changeTimer, _changeTime, _K_Reads, _prev_raw_value;
-    int64_t _prev_value;
+    bool _direction = 0;
+    uint16_t _map_min = 0, _map_max = 0;
+    uint16_t _treshold = 0, _changeTimer = 0, _changeTime = 0, _K_Reads = 0, _prev_raw_value = 0;
+    int32_t _prev_value = 0;
 
 public:
     Potentiometr(uint8_t pin, bool direction = 1, uint16_t K_Reads = 20, uint16_t map_min = 0, uint16_t map_max = 1023, uint16_t treshold = 5, uint16_t changeTime = 200);
     ~Potentiometr();
     bool tick();
-    uint16_t getValue();
+    int32_t getValue();
     uint16_t readRaw();
     uint16_t getRawValue();
 };
@@ -42,6 +42,15 @@ Potentiometr::Potentiometr(uint8_t pin, bool direction, uint16_t K_Reads, uint16
     _treshold = treshold;
     _changeTime = changeTime;
     pinMode(_pin, INPUT_PULLUP);
+
+    _prev_raw_value = readRaw();
+    if (_direction)
+    {
+        _prev_value = (int32_t)map((long)_prev_raw_value, 0, 1023, (long)_map_min, (long)_map_max);
+    }
+    else
+        _prev_value = (int32_t)map((long)_prev_raw_value, 0, 1023, (long)_map_max, (long)_map_min);
+
     // pinMode(_pin, INPUT);
 }
 
@@ -60,42 +69,46 @@ Potentiometr::~Potentiometr()
 bool Potentiometr::tick()
 {
     uint16_t raw_value = readRaw();
-    if (((int32_t)raw_value - _prev_raw_value < -_treshold) || ((int32_t)raw_value - _prev_raw_value > _treshold))
+
+    if (((int)raw_value - (int)_prev_raw_value < -(int)_treshold) || ((int)raw_value - (int)_prev_raw_value > (int)_treshold))
     {
+        DD("Treshold");
         _changeTimer = millis();
         _prev_raw_value = raw_value;
         if (_direction)
-            _prev_value = map(_prev_raw_value, 0, 1023, _map_min, _map_max);
+            _prev_value = (int32_t)map((long)_prev_raw_value, 0, 1023, (long)_map_min, (long)_map_max);
         else
-            _prev_value = map(_prev_raw_value, 0, 1023, _map_max, _map_min);
+            _prev_value = (int32_t)map((long)_prev_raw_value, 0, 1023, (long)_map_max, (long)_map_min);
         return true;
     }
-    if ((uint16_t)millis() - _changeTimer <= _changeTime && (((int32_t)raw_value - _prev_raw_value < -1) || ((int32_t)raw_value - _prev_raw_value > 1)))
+    if ((uint16_t)millis() - _changeTimer <= _changeTime && (((int)raw_value - (int)_prev_raw_value < -1) || ((int)raw_value - (int)_prev_raw_value > 1)))
     {
+        DD("Treshold 1");
         _prev_raw_value = raw_value;
         if (_direction)
-            _prev_value = map(_prev_raw_value, 0, 1023, _map_min, _map_max);
+            _prev_value = (int32_t)map((long)_prev_raw_value, 0, 1023, (long)_map_min, (long)_map_max);
         else
-            _prev_value = map(_prev_raw_value, 0, 1023, _map_max, _map_min);
+            _prev_value = (int32_t)map((long)_prev_raw_value, 0, 1023, (long)_map_max, (long)_map_min);
         _changeTimer = millis();
         return true;
     }
     return false;
 }
 
-uint16_t Potentiometr::getValue()
+int32_t Potentiometr::getValue()
 {
     // tick();
+
     return _prev_value;
 }
 uint16_t Potentiometr::readRaw()
 {
-    uint64_t temp;
-    for (uint16_t i = 0; i < _K_Reads; ++i)
+    uint32_t temp = 0;
+    for (uint16_t i = 0; i < _K_Reads; i++)
     {
-        temp += analogRead(_pin);
+        temp += (uint32_t)analogRead(_pin);
     }
-    return temp / _K_Reads;
+    return (uint16_t)(temp / (uint32_t)_K_Reads);
 }
 uint16_t Potentiometr::getRawValue()
 {

@@ -1,13 +1,14 @@
 #include <Arduino.h>
+#define MY_DEBUG
+#include "My_Debug.h"
+#include "Timer.h"
 #include <GyverDS18Single.h>
 #include "Relay.h"
 #include "Potentiometr.h"
 #include "SimpleLed.h"
 #include <EEManager.h>
 #include <GyverButton.h>
-#define MY_DEBUG
-#include "My_Debug.h"
-#include "Timer.h"
+
 
 #define PIN_SENS_FRIDGE 2
 #define PIN_SENS_FREEZER 3
@@ -57,7 +58,7 @@ EEManager EE_noFrostOnTempTrigger(noFrostOnTempTrigger, 60000);
 #define TEMP_FRIDGE_REQ_MAX_RANGE 10
 #define TEMP_FRIDGE_REQ_MIN_RANGE 1
 
-#define EEKEY 'c'
+#define EEKEY 'a'
 
 GyverDS18Single sensorFridge(PIN_SENS_FRIDGE, 0);
 GyverDS18Single sensorFreezer(PIN_SENS_FREEZER, 0);
@@ -108,6 +109,18 @@ void setup()
 #endif
     PotFreezerL.tick();
     PotFridgeR.tick();
+    // DDD("Value: ");
+    // DD(PotFreezerL.getRawValue());
+    // DDD("map: ");
+    // DD(map(PotFreezerL.getRawValue(),0,1023,TEMP_FREEZER_REQ_MIN,TEMP_FREEZER_REQ_MAX));
+    // DD("");
+    // DDD("Freezer req: ");
+    // DD(PotFreezerL.getValue());
+    // DDD("Fridge req: ");
+    // DD(PotFridgeR.getValue());
+
+    
+
     tempFreezerReq = PotFreezerL.getValue();
     tempFridgeReq = PotFridgeR.getValue();
     sensorFridge.requestTemp();
