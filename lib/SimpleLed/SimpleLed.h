@@ -15,6 +15,7 @@ public:
     ~SimpleLed();
     bool blink(uint16_t blink_time);
     bool blink(uint16_t blink_time, uint16_t k);
+    void reset();
 
     void toggle()
     {
@@ -48,7 +49,7 @@ bool SimpleLed::blink(uint16_t blink_time)
 {
     if ((uint16_t)millis() - _tmr_blink_time >= blink_time)
     {
-        _tmr_blink_time += blink_time;
+        _tmr_blink_time = millis();
         toggle();
         _blink_i = 0;
     }
@@ -64,7 +65,7 @@ bool SimpleLed::blink(uint16_t blink_time, uint16_t k)
     }
     if ((uint16_t)millis() - _tmr_blink_time >= blink_time)
     {
-        _tmr_blink_time += blink_time;
+        _tmr_blink_time = millis();
         toggle();
         if (!_state)
         {
@@ -72,4 +73,10 @@ bool SimpleLed::blink(uint16_t blink_time, uint16_t k)
         }
     }
     return true;
+}
+
+void SimpleLed::reset()
+{
+    _tmr_blink_time = millis();
+    _blink_i = 0;
 }
