@@ -9,7 +9,6 @@
 #include <EEManager.h>
 #include <GyverButton.h>
 
-
 #define PIN_SENS_FRIDGE 2
 #define PIN_SENS_FREEZER 3
 
@@ -67,7 +66,7 @@ GButton button(PIN_BUTTON);
 Potentiometr PotFreezerL(PIN_POT_L, true, 20, TEMP_FREEZER_REQ_MIN, TEMP_FREEZER_REQ_MAX, 5, 200);
 Potentiometr PotFridgeR(PIN_POT_R, true, 20, TEMP_FRIDGE_REQ_MIN, TEMP_FRIDGE_REQ_MAX, 5, 200);
 
-Relay relay_compressor(PIN_COMPRESSOR, 1, RELAY_CHANGE_TIME), relay_no_frost(PIN_NO_FROST, 1, 10000);
+Relay relay_compressor(PIN_COMPRESSOR, 0, RELAY_CHANGE_TIME), relay_no_frost(PIN_NO_FROST, 0, 10000);
 uint64_t TimerCompressorWork = 0, TimerChill = 0, TimerAutoChill = 0;
 bool chilling = 0;
 
@@ -109,17 +108,10 @@ void setup()
 #endif
     PotFreezerL.tick();
     PotFridgeR.tick();
-    // DDD("Value: ");
-    // DD(PotFreezerL.getRawValue());
-    // DDD("map: ");
-    // DD(map(PotFreezerL.getRawValue(),0,1023,TEMP_FREEZER_REQ_MIN,TEMP_FREEZER_REQ_MAX));
-    // DD("");
-    // DDD("Freezer req: ");
-    // DD(PotFreezerL.getValue());
-    // DDD("Fridge req: ");
-    // DD(PotFridgeR.getValue());
-
-    
+    DDD("Relay_no_frost:  ");
+    DD(digitalRead(PIN_NO_FROST));
+    DDD("Relay_compressor: ");
+    DD(digitalRead(PIN_COMPRESSOR));
 
     tempFreezerReq = PotFreezerL.getValue();
     tempFridgeReq = PotFridgeR.getValue();
