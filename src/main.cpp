@@ -681,17 +681,14 @@ void loop()
             DD(tempFridgeReq);
             EE_tempFridgeReq.update();
 
-            uint16_t speed = 200;
+            uint16_t speed = 500;
             if (temp < 0)
             {
-                speed = 500;
+                speed = 1000;
                 temp = -temp;
             }
             uint8_t KL = (temp / 10) % 10, KR = temp % 10;
-            DDD("KL: ");
-            DD(KL);
-            DDD("KR: ");
-            DD(KR);
+          
             while (ledFreezerL.blink(speed, KL))
             {
                 DD("tempFridgeReq: ledFreezerL.blink(speed, KL)", 1000);
@@ -706,6 +703,7 @@ void loop()
             delay(100);
             ledFreezerL.set(0);
             ledFridgeR.set(0);
+            delay(1000);
         }
         mode = MODE_NORMAL;
     }
