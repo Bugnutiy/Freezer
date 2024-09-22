@@ -57,7 +57,7 @@ EEManager EE_noFrostOnTempTrigger(noFrostOnTempTrigger, 60000);
 #define TEMP_FRIDGE_REQ_MAX_RANGE 10
 #define TEMP_FRIDGE_REQ_MIN_RANGE 1
 
-#define EEKEY 'a'
+#define EEKEY 'c'
 
 GyverDS18Single sensorFridge(PIN_SENS_FRIDGE, 0);
 GyverDS18Single sensorFreezer(PIN_SENS_FREEZER, 0);
@@ -96,8 +96,8 @@ uint8_t mode = 0;
 
 void setup()
 {
-    relay_no_frost.off();
-    relay_compressor.off();
+    // relay_no_frost.off();
+    // relay_compressor.off();
     button.setDebounce(100);
     button.setDirection(NORM_OPEN);
     button.setTickMode(1);
@@ -171,12 +171,14 @@ void setup()
     ledBuiltin.set(0);
     ledFridgeR.set(0);
 
-    while (millis() < 20000)
-    {
-        ledFreezerL.blink(2000);
-        DD("Waiting 20s before starting", 1000);
-    }
+    // while (millis() < 20000)
+    // {
+    //     ledFreezerL.blink(2000);
+    //     DD("Waiting 20s before starting", 1000);
+    // }
     ledFreezerL.set(0);
+    relay_compressor.resetTimer();
+    relay_no_frost.resetTimer();
     DD("Starting...");
 }
 
@@ -215,8 +217,8 @@ void tempUpdate()
         if (sensorFridge.readTemp())
         { // если чтение успешно
             tempFridge = sensorFridge.getTempInt();
-            DDD("tempFridge:", 1000);
-            DD(tempFridge, 1000);
+            DDD("tempFridge:", 5000);
+            DD(tempFridge, 5000);
         }
         else
         {
@@ -231,8 +233,8 @@ void tempUpdate()
         if (sensorFreezer.readTemp())
         { // если чтение успешно
             tempFreezer = sensorFreezer.getTempInt();
-            DDD("tempFreezer: ", 1000);
-            DD(tempFreezer, 1000);
+            DDD("tempFreezer: ", 5000);
+            DD(tempFreezer, 5000);
         }
         else
         {
@@ -285,7 +287,7 @@ void noFrostFunc()
         noFrostEEPROMTimer++;
         DD("noFrostFunc hour timer");
     });
-    if (noFrostOnTimer >= NO_FROST_ON_TIME && !relay_no_frost.getState())
+    if (noFrostOnTimer > NO_FROST_ON_TIME && !relay_no_frost.getState())
     {
         // mode = MODE_NO_FROST;
         DD("noFrostOnTimer >= NO_FROST_ON_TIME && !relay_no_frost.getState()");
@@ -293,7 +295,7 @@ void noFrostFunc()
         noFrostOffTimer = 0;
         relay_no_frost.on();
     }
-    if (noFrostEEPROMTimer >= NO_FROST_EEPROM_TIME)
+    if (noFrostEEPROMTimer > NO_FROST_EEPROM_TIME)
     {
         EE_noFrostOnTimer.update();
         DD("noFrostEEPROMTimer >= NO_FROST_EEPROM_TIME");
@@ -313,7 +315,7 @@ void noFrostFunc()
             DD("noFrostOffTimer++");
             noFrostOffTimer++;
         });
-        if (noFrostOffTimer >= NO_FROST_OFF_TIME)
+        if (noFrostOffTimer > NO_FROST_OFF_TIME)
         {
             DD("noFrostOffTimer >= NO_FROST_OFF_TIME");
             relay_no_frost.off();
@@ -379,13 +381,17 @@ void ButtonHold()
             ledFreezerL.set(0);
             ledFridgeR.set(0);
             delay(2000);
-            uint16_t speed = 200;
+            uint16_t speed = 1000;
             if (temp < 0)
             {
-                speed = 500;
+                speed = 2000;
                 temp = -temp;
             }
             uint8_t KL = (temp / 10) % 10, KR = temp % 10;
+            DDD("KL: ");
+            DD(KL);
+            DDD("KR: ");
+            DD(KR);
             while (ledFreezerL.blink(speed, KL))
             {
                 DD("tempFreezerReq: ledFreezerL.blink(speed, KL)", 1000);
@@ -550,6 +556,10 @@ void loop()
             uint16_t speed = 500;
 
             uint8_t KL = (range / 10) % 10, KR = range % 10;
+            DDD("KL: ");
+            DD(KL);
+            DDD("KR: ");
+            DD(KR);
             while (ledFreezerL.blink(speed, KL))
             {
                 DD("rangeChanged: ledFreezerL.blink(speed, KL)", 1000);
@@ -578,6 +588,10 @@ void loop()
                 temp = -temp;
             }
             uint8_t KL = (temp / 10) % 10, KR = temp % 10;
+            DDD("KL: ");
+            DD(KL);
+            DDD("KR: ");
+            DD(KR);
             while (ledFreezerL.blink(speed, KL))
             {
                 DD("tempFreezerReq: ledFreezerL.blink(speed, KL)", 1000);
@@ -645,6 +659,10 @@ void loop()
             uint16_t speed = 500;
 
             uint8_t KL = (range / 10) % 10, KR = range % 10;
+            DDD("KL: ");
+            DD(KL);
+            DDD("KR: ");
+            DD(KR);
             while (ledFreezerL.blink(speed, KL))
             {
                 DD("rangeChanged: ledFreezerL.blink(speed, KL)", 1000);
@@ -674,6 +692,10 @@ void loop()
                 temp = -temp;
             }
             uint8_t KL = (temp / 10) % 10, KR = temp % 10;
+            DDD("KL: ");
+            DD(KL);
+            DDD("KR: ");
+            DD(KR);
             while (ledFreezerL.blink(speed, KL))
             {
                 DD("tempFridgeReq: ledFreezerL.blink(speed, KL)", 1000);

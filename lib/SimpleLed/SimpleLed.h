@@ -50,7 +50,7 @@ bool SimpleLed::blink(uint16_t blink_time)
     {
         _tmr_blink_time += blink_time;
         toggle();
-        _blink_i=0;
+        _blink_i = 0;
     }
     return _state;
 }
@@ -65,10 +65,11 @@ bool SimpleLed::blink(uint16_t blink_time, uint16_t k)
     if ((uint16_t)millis() - _tmr_blink_time >= blink_time)
     {
         _tmr_blink_time += blink_time;
-
         toggle();
         if (!_state)
+        {
             _blink_i++;
+        }
     }
     return true;
 }

@@ -71,7 +71,7 @@ bool Potentiometr::tick()
 
     if (((int32_t)raw_value - (int32_t)_prev_raw_value < -(int32_t)_treshold) || ((int32_t)raw_value - (int32_t)_prev_raw_value > (int32_t)_treshold))
     {
-        DD("Treshold");
+        // DD("Treshold");
         _changeTimer = millis();
         _prev_raw_value = raw_value;
         if (_direction)
@@ -82,7 +82,7 @@ bool Potentiometr::tick()
     }
     if ((uint16_t)millis() - _changeTimer <= _changeTime && (((int32_t)raw_value - (int32_t)_prev_raw_value < -1) || ((int32_t)raw_value - (int32_t)_prev_raw_value > 1)))
     {
-        DD("Treshold 1");
+        // DD("Treshold 1");
         _prev_raw_value = raw_value;
         if (_direction)
             _prev_value = (int32_t)map(_prev_raw_value, 0, 1023, _map_min, _map_max);

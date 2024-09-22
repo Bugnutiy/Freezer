@@ -19,6 +19,8 @@ public:
     void change();
     void setMinChangeTime(uint64_t t);
 
+    void resetTimer();
+
     bool ready();
     void tick();
     bool on();
@@ -90,6 +92,11 @@ void Relay::change()
 void Relay::setMinChangeTime(uint64_t min_change_time)
 {
     _min_change_time = min_change_time;
+}
+
+void Relay::resetTimer()
+{
+    _tmr_min_change_time = -_min_change_time;
 }
 
 /**
