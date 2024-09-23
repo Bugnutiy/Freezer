@@ -79,4 +79,5 @@ void SimpleLed::reset()
 {
     _tmr_blink_time = millis();
     _blink_i = 0;
+    set(0);
 }

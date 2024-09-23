@@ -151,3 +151,82 @@
     }                                       \
   }
 //----------------------------------------------------------------
+#define TMR8_NEXT(T, CODE)                          \
+  {                                                 \
+    static uint8_t tmr##T = 0;                      \
+    if ((uint8_t)((uint8_t)millis() - tmr##T) >= T) \
+    {                                               \
+      tmr##T = millis();                            \
+      CODE                                          \
+    }                                               \
+  }
+
+#define TMR16_NEXT(T, CODE)                           \
+  {                                                   \
+    static uint16_t tmr##T = 0;                       \
+    if ((uint16_t)((uint16_t)millis() - tmr##T) >= T) \
+    {                                                 \
+      tmr##T = millis();                              \
+      CODE                                            \
+    }                                                 \
+  }
+
+#define TMR32_NEXT(T, CODE)                           \
+  {                                                   \
+    static uint32_t tmr##T = 0;                       \
+    if ((uint32_t)((uint32_t)millis() - tmr##T) >= T) \
+    {                                                 \
+      tmr##T = millis();                              \
+      CODE                                            \
+    }                                                 \
+  }
+
+#define TMR64_NEXT(T, CODE)                 \
+  {                                         \
+    static uint64_t tmr##T = 0;             \
+    if ((uint64_t)(millis() - tmr##T) >= T) \
+    {                                       \
+      tmr##T = millis();                    \
+      CODE                                  \
+    }                                       \
+  }
+#define TMR8_NEXT_S(T, CODE)                        \
+  {                                                 \
+    static uint8_t tmr##T = 0;                      \
+    if ((uint8_t)((uint8_t)millis() - tmr##T) >= T) \
+    {                                               \
+      tmr##T += T;                                  \
+      CODE                                          \
+    }                                               \
+  }
+
+#define TMR16_NEXT_S(T, CODE)                         \
+  {                                                   \
+    static uint16_t tmr##T = 0;                       \
+    if ((uint16_t)((uint16_t)millis() - tmr##T) >= T) \
+    {                                                 \
+      tmr##T += T;                                    \
+      CODE                                            \
+    }                                                 \
+  }
+
+#define TMR32_NEXT_S(T, CODE)                         \
+  {                                                   \
+    static uint32_t tmr##T = 0;                       \
+    if ((uint32_t)((uint32_t)millis() - tmr##T) >= T) \
+    {                                                 \
+      tmr##T += T;                                    \
+      CODE                                            \
+    }                                                 \
+  }
+
+#define TMR64_NEXT_S(T, CODE)               \
+  {                                         \
+    static uint64_t tmr##T = 0;             \
+    if ((uint64_t)(millis() - tmr##T) >= T) \
+    {                                       \
+      tmr##T += T;                          \
+      CODE                                  \
+    }                                       \
+  }
+//----------------------------------------------------------------

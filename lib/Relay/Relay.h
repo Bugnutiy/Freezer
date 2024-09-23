@@ -5,17 +5,18 @@
 class Relay
 {
 private:
-    byte _pin;
+    uint8_t _pin;
     bool _truth, _state, _nextState;
     uint64_t _min_change_time, _tmr_min_change_time;
     void _setState(bool state, bool now = 0);
 
 public:
-    Relay(byte pin, bool truth = 1, uint64_t min_change_time = 0);
+    Relay(uint8_t pin, bool truth = 1, uint64_t min_change_time = 0);
     ~Relay();
     bool set(bool state);
     bool setNow(bool state);
     bool getState();
+    bool getNextState();
     void change();
     void setMinChangeTime(uint64_t t);
 
@@ -31,7 +32,7 @@ public:
 /// @param pin номер пина управления реле
 /// @param truth Какой сигнал является сигналом включения 0 или 1 default = 1
 /// @param min_change_time Задержка переключений в мс
-Relay::Relay(byte pin, bool truth, uint64_t min_change_time)
+Relay::Relay(uint8_t pin, bool truth, uint64_t min_change_time)
 {
     pinMode(pin, OUTPUT);
     _pin = pin;
@@ -73,6 +74,12 @@ bool Relay::setNow(bool state)
 bool Relay::getState()
 {
     return _state ^ !_truth;
+}
+/// @brief Узнать следующее состояние реле
+/// @return true - включено, false - выключено
+bool Relay::getNextState()
+{
+    return _nextState ^ !_truth;
 }
 
 /// @brief Переключить реле
@@ -154,6 +161,7 @@ void Relay::_setState(bool state, bool now)
     if (ready() || now)
     {
         _state = state ^ !_truth;
+        _nextState = _state;
         _tmr_min_change_time = millis();
         digitalWrite(_pin, _state);
     }
