@@ -69,8 +69,8 @@ GyverDS18Single sensorFridge(PIN_SENS_FRIDGE, 0);
 GyverDS18Single sensorFreezer(PIN_SENS_FREEZER, 0);
 GButton button(PIN_BUTTON);
 
-Potentiometr PotFreezerL(PIN_POT_L, true, 20, TEMP_FREEZER_REQ_MIN, TEMP_FREEZER_REQ_MAX, 10, 200);
-Potentiometr PotFridgeR(PIN_POT_R, true, 20, TEMP_FRIDGE_REQ_MIN, TEMP_FRIDGE_REQ_MAX, 10, 200);
+Potentiometr PotFreezerL(PIN_POT_L, true, 50, TEMP_FREEZER_REQ_MIN, TEMP_FREEZER_REQ_MAX, 20, 200);
+Potentiometr PotFridgeR(PIN_POT_R, true, 50, TEMP_FRIDGE_REQ_MIN, TEMP_FRIDGE_REQ_MAX, 20, 200);
 
 Relay relay_compressor(PIN_COMPRESSOR, 0, RELAY_CHANGE_TIME), relay_no_frost(PIN_NO_FROST, 0, 10000);
 uint32_t TimerCompressorWork = 0, TimerChill = 0, TimerAutoChill = 0;
@@ -125,6 +125,8 @@ void setup()
         ledBuiltin.blink(200);
         ledFridgeR.blink(200);
         // DD("Waiting for sensorFridge to be ready", 20000);
+        relay_compressor.setNow(1);
+        if(millis()>50000) break;
     }
     if (sensorFridge.readTemp())
     { // если чтение успешно
@@ -136,6 +138,8 @@ void setup()
     {
         ledBuiltin.blink(200);
         ledFreezerL.blink(200);
+        relay_compressor.setNow(1);
+        if(millis()>50000) break;
         // DD("Waiting for sensorFreezer to be ready", 20000);
     }
     if (sensorFreezer.readTemp())
